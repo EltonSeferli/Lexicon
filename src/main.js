@@ -25,6 +25,7 @@ const starterWords = [
 let words = JSON.parse(localStorage.getItem(storageKey)) || starterWords;
 let databaseConnected = false;
 let searchTerm = "";
+let searchDraft = "";
 let quizWord = null;
 let isFlipped = false;
 let quizMode = "flashcard";
@@ -127,7 +128,7 @@ function render() {
       <section class="grid items-start gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.65fr)]">
         <div class="library-panel rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
           <div class="mb-6 flex flex-wrap items-end justify-between gap-4"><div><p class="mb-1 text-xs font-bold uppercase tracking-[0.16em] text-indigo-600">YOUR LIBRARY</p><h2 class="text-2xl font-bold tracking-tight text-slate-900">Saved words <span class="ml-1 text-sm font-medium text-slate-400">${words.length}</span></h2></div><button class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700" data-action="open-add"><span class="text-lg leading-none">+</span> Add new word</button></div>
-          <label class="mb-5 flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-slate-400 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100"><span>⌕</span><input class="w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400" id="search" type="search" value="${escapeHtml(searchTerm)}" placeholder="Search words, definitions, or synonyms..."><kbd class="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px]">/</kbd></label>
+          <label class="mb-5 flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-slate-400 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100"><span>⌕</span><input class="w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400" id="search" type="search" value="${escapeHtml(searchDraft)}" placeholder="Search words, definitions, or synonyms..."><kbd class="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px]">Enter</kbd></label>
           <div class="space-y-3" id="word-list">${filtered.length ? visibleWords.map(wordCard).join("") : emptySearchState()}</div>
           ${filtered.length > pageSize ? pagination(pageCount) : ""}
         </div>
@@ -143,7 +144,7 @@ function render() {
 }
 
 function wordCard({ id, word, definition, synonyms }) {
-  return `<article class="word-card group cursor-pointer rounded-xl border border-slate-200 p-4 transition hover:border-indigo-300 hover:shadow-sm" data-action="view" data-id="${id}" tabindex="0" role="button" aria-label="View ${escapeHtml(word)}"><div class="flex items-start justify-between gap-4"><div class="min-w-0"><h3 class="truncate text-lg font-bold text-slate-900">${escapeHtml(word)}</h3><p class="mt-1 text-xs font-semibold text-indigo-600">${escapeHtml(synonyms.join(", "))}</p></div><div class="flex shrink-0 gap-1 opacity-0 transition group-hover:opacity-100"><button class="rounded-md p-2 text-slate-400 hover:bg-slate-100 hover:text-indigo-600" data-action="edit" data-id="${id}" aria-label="Edit ${escapeHtml(word)}">✎</button><button class="rounded-md p-2 text-slate-400 hover:bg-red-50 hover:text-red-500" data-action="delete" data-id="${id}" aria-label="Delete ${escapeHtml(word)}">×</button></div></div><p class="mt-3 text-sm leading-6 text-slate-500">${escapeHtml(definition)}</p></article>`;
+  return `<article class="word-card group cursor-pointer rounded-xl border border-slate-200 p-4 transition hover:border-indigo-300 hover:shadow-sm" data-action="view" data-id="${id}" tabindex="0" role="button" aria-label="View ${escapeHtml(word)}"><div class="flex items-start justify-between gap-4"><div class="min-w-0"><h3 class="truncate text-lg font-bold text-slate-900">${escapeHtml(word)}</h3><p class="mt-1 text-xs font-semibold text-indigo-600">${escapeHtml(synonyms.join(", "))}</p></div><div class="flex shrink-0 gap-1 opacity-0 transition group-hover:opacity-100"><button class="rounded-md p-2 text-slate-400 hover:bg-slate-100 hover:text-indigo-600" data-action="info" data-id="${id}" aria-label="View details for ${escapeHtml(word)}" title="View details">ⓘ</button><button class="rounded-md p-2 text-slate-400 hover:bg-slate-100 hover:text-indigo-600" data-action="edit" data-id="${id}" aria-label="Edit ${escapeHtml(word)}" title="Edit">✎</button><button class="rounded-md p-2 text-slate-400 hover:bg-red-50 hover:text-red-500" data-action="delete" data-id="${id}" aria-label="Delete ${escapeHtml(word)}" title="Delete">×</button></div></div><p class="mt-3 text-sm leading-6 text-slate-500">${escapeHtml(definition)}</p></article>`;
 }
 function pagination(pageCount) {
   return `<nav class="mt-5 flex items-center justify-between border-t border-slate-200/20 pt-4" aria-label="Word pages"><button class="rounded-md border border-slate-200/30 px-3 py-2 text-xs font-bold text-slate-300 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40" data-action="previous-page" ${currentPage === 1 ? "disabled" : ""}>Previous</button><span class="text-xs font-semibold text-slate-400">Page ${currentPage} of ${pageCount}</span><button class="rounded-md border border-slate-200/30 px-3 py-2 text-xs font-bold text-slate-300 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40" data-action="next-page" ${currentPage === pageCount ? "disabled" : ""}>Next</button></nav>`;
@@ -269,7 +270,12 @@ function startNextWordCountdown() {
 }
 function bindEvents() {
   document.querySelector("#search").addEventListener("input", (event) => {
-    searchTerm = event.target.value;
+    searchDraft = event.target.value;
+  });
+  document.querySelector("#search").addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    searchTerm = searchDraft.trim();
     currentPage = 1;
     render();
   });
@@ -373,26 +379,29 @@ function bindEvents() {
 }
 
 function bindWordActions() {
+  const showWordDetails = (id) => {
+    const word = words.find((entry) => String(entry.id) === id);
+    if (!word) return;
+    document.querySelector("#detail-word").textContent = word.word;
+    document.querySelector("#detail-definition").textContent = word.definition;
+    document.querySelector("#detail-synonyms").textContent = word.synonyms.join(", ");
+    document.querySelector("#word-detail-dialog").showModal();
+  };
   document.querySelectorAll('[data-action="view"]').forEach((card) => {
-    const openDetails = () => {
-      const word = words.find((entry) => String(entry.id) === card.dataset.id);
-      if (!word) return;
-      document.querySelector("#detail-word").textContent = word.word;
-      document.querySelector("#detail-definition").textContent = word.definition;
-      document.querySelector("#detail-synonyms").textContent = word.synonyms.join(", ");
-      document.querySelector("#word-detail-dialog").showModal();
-    };
     card.addEventListener("click", (event) => {
       if (event.target.closest("button")) return;
-      openDetails();
+      showWordDetails(card.dataset.id);
     });
     card.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        openDetails();
+        showWordDetails(card.dataset.id);
       }
     });
   });
+  document.querySelectorAll('[data-action="info"]').forEach((button) =>
+    button.addEventListener("click", () => showWordDetails(button.dataset.id)),
+  );
   document
     .querySelectorAll('[data-action="edit"]')
     .forEach((button) =>
