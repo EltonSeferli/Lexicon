@@ -1,6 +1,7 @@
 import "./style.css";
 
 const storageKey = "lexicon-words";
+const progressStorageKey = "lexicon-progress";
 const starterWords = [
   {
     id: 1,
@@ -23,7 +24,10 @@ const starterWords = [
 ];
 
 let words = JSON.parse(localStorage.getItem(storageKey)) || starterWords;
+let progressEntries =
+  JSON.parse(localStorage.getItem(progressStorageKey)) || [];
 let databaseConnected = false;
+let currentView = "library";
 let searchTerm = "";
 let searchDraft = "";
 let quizWord = null;
@@ -57,6 +61,8 @@ const escapeHtml = (value) =>
       ],
   );
 const saveWords = () => localStorage.setItem(storageKey, JSON.stringify(words));
+const saveProgress = () =>
+  localStorage.setItem(progressStorageKey, JSON.stringify(progressEntries));
 const apiRequest = async (path, options = {}) => {
   const response = await fetch(`/api${path}`, {
     headers: { "Content-Type": "application/json" },
@@ -106,6 +112,10 @@ const pickQuizWord = () => {
 };
 
 function render() {
+  if (currentView === "progress") {
+    renderProgress();
+    return;
+  }
   const filtered = matchingWords();
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   currentPage = Math.min(currentPage, pageCount);
@@ -116,7 +126,7 @@ function render() {
   app.innerHTML = `
     <header class="border-b border-slate-200 bg-white/85">
       <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 lg:px-8">
-        <a class="flex items-center gap-2.5 text-lg font-bold tracking-tight text-slate-900" href="#"><img class="h-8 w-8" src="/logo.svg" alt="Lexicon logo">Lexicon</a>
+        <div class="flex items-center gap-6"><a class="flex items-center gap-2.5 text-lg font-bold tracking-tight text-slate-900" href="#"><img class="h-8 w-8" src="/logo.svg" alt="Lexicon logo">Lexicon</a><nav class="flex items-center gap-1 rounded-lg bg-slate-800/80 p-1" aria-label="Main navigation"><button class="rounded-md px-3 py-1.5 text-xs font-bold ${currentView === "library" ? "bg-indigo-500 text-white" : "text-slate-400 hover:text-white"}" data-action="show-library">Library</button><button class="rounded-md px-3 py-1.5 text-xs font-bold ${currentView === "progress" ? "bg-indigo-500 text-white" : "text-slate-400 hover:text-white"}" data-action="show-progress">Progress</button></nav></div>
         <span class="hidden text-xs font-medium text-slate-500 sm:block">${databaseConnected ? "MongoDB connected" : "Local cache mode"}</span>
       </div>
     </header>
@@ -141,6 +151,168 @@ function render() {
     <footer class="mx-auto flex max-w-7xl justify-between px-5 pb-7 text-xs text-slate-400 lg:px-8"><span>Saved automatically</span><span>Personal study space</span></footer>
     ${wordDialog()}${wordDetailDialog()}${deleteDialog()}`;
   bindEvents();
+}
+
+function renderProgress() {
+  const entries = [...progressEntries].sort(
+    (first, second) => new Date(second.createdAt) - new Date(first.createdAt),
+  );
+  app.innerHTML = `
+    <header class="border-b border-slate-200 bg-white/85">
+      <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 lg:px-8">
+        <div class="flex items-center gap-6"><a class="flex items-center gap-2.5 text-lg font-bold tracking-tight text-slate-900" href="#"><img class="h-8 w-8" src="/logo.svg" alt="Lexicon logo">Lexicon</a><nav class="flex items-center gap-1 rounded-lg bg-slate-800/80 p-1" aria-label="Main navigation"><button class="rounded-md px-3 py-1.5 text-xs font-bold text-slate-400 hover:text-white" data-action="show-library">Library</button><button class="rounded-md bg-indigo-500 px-3 py-1.5 text-xs font-bold text-white" data-action="show-progress">Progress</button></nav></div>
+        <span class="hidden text-xs font-medium text-slate-500 sm:block">${entries.length} ${entries.length === 1 ? "entry" : "entries"}</span>
+      </div>
+    </header>
+    <main class="progress-page mx-auto max-w-7xl px-5 py-8 lg:px-8 lg:py-12">
+      <section class="progress-hero mb-8 flex flex-col justify-between gap-6 rounded-2xl p-6 sm:flex-row sm:items-end sm:p-8"><div><p class="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-cyan-300">DAILY PROGRESS</p><h1 class="text-4xl font-bold tracking-tight text-white sm:text-5xl">Small wins,<br><span class="text-cyan-300">clearly remembered.</span></h1><p class="mt-4 max-w-md text-sm leading-6 text-slate-300">Save a screenshot and a note for every study session. Your progress stays in this browser.</p></div><button class="inline-flex items-center justify-center gap-2 rounded-lg bg-cyan-300 px-4 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-950/20 transition hover:bg-cyan-200" data-action="open-progress-add"><span class="text-xl leading-none">+</span> Add progress</button></section>
+      <section class="mb-5 flex items-end justify-between"><div><p class="mb-1 text-xs font-bold uppercase tracking-[0.16em] text-cyan-300">YOUR JOURNEY</p><h2 class="text-2xl font-bold tracking-tight text-white">Study entries <span class="ml-1 text-sm font-medium text-slate-500">${entries.length}</span></h2></div></section>
+      ${entries.length ? `<section class="progress-grid">${entries.map(progressCard).join("")}</section>` : progressEmptyState()}
+    </main>
+    <footer class="mx-auto flex max-w-7xl justify-between px-5 pb-7 text-xs text-slate-500 lg:px-8"><span>Saved automatically</span><span>Keep showing up</span></footer>
+    ${progressDialog()}${progressDetailDialog()}`;
+  bindProgressEvents();
+}
+
+function progressCard(entry) {
+  const date = new Date(entry.createdAt);
+  return `<button class="progress-card group text-left" data-action="progress-info" data-id="${entry.id}"><div class="progress-image-wrap">${entry.image ? `<img src="${escapeHtml(entry.image)}" alt="${escapeHtml(entry.title)} screenshot">` : `<div class="progress-image-placeholder">No screenshot</div>`}<span class="progress-date">${date.toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}</span></div><div class="p-5"><div class="mb-3 flex items-start justify-between gap-3"><h3 class="text-lg font-bold text-white">${escapeHtml(entry.title)}</h3><span class="progress-score">${escapeHtml(entry.score || "Entry")}</span></div><p class="line-clamp-2 text-sm leading-6 text-slate-400">${escapeHtml(entry.note || "No note added.")}</p><p class="mt-4 text-xs font-medium text-slate-500">${date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })} · Click to open</p></div></button>`;
+}
+
+function progressEmptyState() {
+  return `<section class="progress-empty"><div class="progress-empty-icon">↗</div><h2 class="text-xl font-bold text-white">Your first entry is waiting</h2><p class="mt-2 max-w-sm text-sm leading-6 text-slate-400">Add a screenshot of today's result, give it a title, and leave yourself a useful note.</p><button class="mt-6 rounded-lg border border-cyan-300/50 px-4 py-2.5 text-sm font-bold text-cyan-300 transition hover:bg-cyan-300/10" data-action="open-progress-add">Create first entry</button></section>`;
+}
+
+function progressDialog() {
+  return `<dialog id="progress-dialog" class="progress-dialog"><form id="progress-form" class="p-6 sm:p-8"><div class="mb-7 flex items-start justify-between"><div><p class="mb-1 text-xs font-bold uppercase tracking-[0.16em] text-cyan-600">NEW ENTRY</p><h2 class="text-2xl font-bold text-slate-900">Save today's progress</h2></div><button class="rounded-lg p-2 text-xl leading-none text-slate-400 hover:bg-slate-100" type="button" data-action="close-progress-dialog" aria-label="Close">×</button></div><label class="mb-4 block text-xs font-bold uppercase tracking-wider text-slate-500">Title<input class="progress-input mt-2" id="progress-title" required placeholder="e.g. Reading practice"></label><div class="mb-4 grid gap-4 sm:grid-cols-2"><label class="block text-xs font-bold uppercase tracking-wider text-slate-500">Result / score<input class="progress-input mt-2" id="progress-score" placeholder="e.g. 25 / 40"></label><label class="block text-xs font-bold uppercase tracking-wider text-slate-500">Screenshot<input class="progress-input mt-2 p-2" id="progress-image" type="file" accept="image/png,image/jpeg,image/webp" required></label></div><label class="mb-6 block text-xs font-bold uppercase tracking-wider text-slate-500">Note<textarea class="progress-input mt-2 min-h-28 resize-y" id="progress-note" placeholder="What did you learn or improve today?"></textarea></label><div class="mb-6 hidden overflow-hidden rounded-lg border border-slate-200 bg-slate-50" id="progress-preview-wrap"><img class="max-h-52 w-full object-contain" id="progress-preview" alt="Screenshot preview"></div><button class="flex w-full items-center justify-between rounded-lg bg-slate-900 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-700" type="submit">Save progress <span class="text-lg">→</span></button></form></dialog>`;
+}
+
+function progressDetailDialog() {
+  return `<dialog id="progress-detail-dialog" class="progress-detail-dialog"><div id="progress-detail-content"></div></dialog>`;
+}
+
+function bindNavigation() {
+  document
+    .querySelector('[data-action="show-library"]')
+    ?.addEventListener("click", () => {
+      currentView = "library";
+      render();
+    });
+  document
+    .querySelector('[data-action="show-progress"]')
+    ?.addEventListener("click", () => {
+      currentView = "progress";
+      render();
+    });
+}
+
+function bindProgressEvents() {
+  bindNavigation();
+  const dialog = document.querySelector("#progress-dialog");
+  document
+    .querySelectorAll('[data-action="open-progress-add"]')
+    .forEach((button) =>
+      button.addEventListener("click", () => {
+        document.querySelector("#progress-form").reset();
+        document
+          .querySelector("#progress-preview-wrap")
+          .classList.add("hidden");
+        dialog.showModal();
+        document.querySelector("#progress-title").focus();
+      }),
+    );
+  document
+    .querySelector('[data-action="close-progress-dialog"]')
+    ?.addEventListener("click", () => dialog.close());
+  document
+    .querySelector("#progress-image")
+    ?.addEventListener("change", (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+      if (file.size > 8 * 1024 * 1024) {
+        window.alert("Please choose an image smaller than 8 MB.");
+        event.target.value = "";
+        return;
+      }
+      const reader = new FileReader();
+      reader.addEventListener("load", () => {
+        document.querySelector("#progress-preview").src = reader.result;
+        document
+          .querySelector("#progress-preview-wrap")
+          .classList.remove("hidden");
+      });
+      reader.readAsDataURL(file);
+    });
+  document
+    .querySelector("#progress-form")
+    ?.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const image = document.querySelector("#progress-preview").src;
+      if (!image) return;
+      progressEntries.push({
+        id: Date.now(),
+        title: document.querySelector("#progress-title").value.trim(),
+        score: document.querySelector("#progress-score").value.trim(),
+        note: document.querySelector("#progress-note").value.trim(),
+        image,
+        createdAt: new Date().toISOString(),
+      });
+      saveProgress();
+      dialog.close();
+      render();
+    });
+  document
+    .querySelectorAll('[data-action="progress-info"]')
+    .forEach((button) =>
+      button.addEventListener("click", () =>
+        openProgressDetails(button.dataset.id),
+      ),
+    );
+  document
+    .querySelector('[data-action="close-progress-detail"]')
+    ?.addEventListener("click", () =>
+      document.querySelector("#progress-detail-dialog").close(),
+    );
+  document
+    .querySelector('[data-action="delete-progress"]')
+    ?.addEventListener("click", () => {
+      const id = document.querySelector("#progress-detail-dialog").dataset.id;
+      progressEntries = progressEntries.filter(
+        (entry) => String(entry.id) !== id,
+      );
+      saveProgress();
+      document.querySelector("#progress-detail-dialog").close();
+      render();
+    });
+  document.querySelectorAll("dialog").forEach((currentDialog) =>
+    currentDialog.addEventListener("click", (event) => {
+      if (event.target === currentDialog) currentDialog.close();
+    }),
+  );
+}
+
+function openProgressDetails(id) {
+  const entry = progressEntries.find((item) => String(item.id) === id);
+  if (!entry) return;
+  const date = new Date(entry.createdAt);
+  const dialog = document.querySelector("#progress-detail-dialog");
+  dialog.dataset.id = id;
+  document.querySelector("#progress-detail-content").innerHTML =
+    `<div class="p-6 sm:p-8"><div class="mb-6 flex items-start justify-between gap-4"><div><p class="mb-1 text-xs font-bold uppercase tracking-[0.16em] text-cyan-600">PROGRESS DETAIL</p><h2 class="text-2xl font-bold text-slate-900">${escapeHtml(entry.title)}</h2><p class="mt-2 text-xs font-medium text-slate-500">${date.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })} at ${date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</p></div><button class="rounded-lg p-2 text-xl leading-none text-slate-400 hover:bg-slate-100" type="button" data-action="close-progress-detail" aria-label="Close">×</button></div>${entry.image ? `<img class="mb-6 max-h-[55vh] w-full rounded-lg bg-slate-100 object-contain" src="${escapeHtml(entry.image)}" alt="${escapeHtml(entry.title)} screenshot">` : ""}<div class="rounded-lg bg-slate-50 p-4"><p class="text-xs font-bold uppercase tracking-wider text-slate-500">Result</p><p class="mt-1 text-xl font-bold text-cyan-700">${escapeHtml(entry.score || "Not specified")}</p><p class="mt-4 text-xs font-bold uppercase tracking-wider text-slate-500">Note</p><p class="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-600">${escapeHtml(entry.note || "No note added.")}</p></div><button class="mt-6 text-sm font-bold text-red-500 hover:text-red-700" type="button" data-action="delete-progress">Delete entry</button></div>`;
+  dialog.showModal();
+  document
+    .querySelector('[data-action="close-progress-detail"]')
+    .addEventListener("click", () => dialog.close());
+  document
+    .querySelector('[data-action="delete-progress"]')
+    .addEventListener("click", () => {
+      progressEntries = progressEntries.filter(
+        (item) => String(item.id) !== id,
+      );
+      saveProgress();
+      dialog.close();
+      render();
+    });
 }
 
 function wordCard({ id, word, definition, synonyms }) {
@@ -269,6 +441,7 @@ function startNextWordCountdown() {
   }, 1000);
 }
 function bindEvents() {
+  bindNavigation();
   document.querySelector("#search").addEventListener("input", (event) => {
     searchDraft = event.target.value;
   });
