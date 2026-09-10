@@ -1,0 +1,14 @@
+{
+  "name": "lexicon-functions",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "engines": {
+    "node": "22"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "firebase-functions": "^6.3.2",
+    "mongodb": "^6.17.1"
+  }
+}

@@ -108,7 +108,7 @@ function render() {
     <header class="border-b border-slate-200 bg-white/85">
       <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 lg:px-8">
         <a class="flex items-center gap-2.5 text-lg font-bold tracking-tight text-slate-900" href="#"><span class="grid h-8 w-8 place-items-center rounded-lg bg-indigo-600 text-sm text-white">L</span>Lexicon</a>
-        <span class="hidden text-xs font-medium text-slate-500 sm:block">${databaseConnected ? "MySQL connected" : "Local cache mode"}</span>
+        <span class="hidden text-xs font-medium text-slate-500 sm:block">${databaseConnected ? "MongoDB connected" : "Local cache mode"}</span>
       </div>
     </header>
     <main class="mx-auto max-w-7xl px-5 py-8 lg:px-8 lg:py-12">
@@ -350,18 +350,18 @@ function bindWordActions() {
     .querySelectorAll('[data-action="edit"]')
     .forEach((button) =>
       button.addEventListener("click", () =>
-        openDialog(words.find((word) => word.id === Number(button.dataset.id))),
+        openDialog(words.find((word) => String(word.id) === button.dataset.id)),
       ),
     );
   document.querySelectorAll('[data-action="delete"]').forEach((button) =>
     button.addEventListener("click", async () => {
-      const id = Number(button.dataset.id);
+      const id = button.dataset.id;
       try {
         if (databaseConnected)
           await apiRequest(`/words/${id}`, { method: "DELETE" });
-        words = words.filter((word) => word.id !== id);
+        words = words.filter((word) => String(word.id) !== id);
         saveWords();
-        if (quizWord?.id === id) pickQuizWord();
+        if (quizWord && String(quizWord.id) === id) pickQuizWord();
         render();
       } catch (error) {
         window.alert("The database is unavailable. The word was not deleted.");
