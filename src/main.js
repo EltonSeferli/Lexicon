@@ -384,7 +384,8 @@ function bindWordActions() {
     if (!word) return;
     document.querySelector("#detail-word").textContent = word.word;
     document.querySelector("#detail-definition").textContent = word.definition;
-    document.querySelector("#detail-synonyms").textContent = word.synonyms.join(", ");
+    document.querySelector("#detail-synonyms").textContent =
+      word.synonyms.join(", ");
     document.querySelector("#word-detail-dialog").showModal();
   };
   document.querySelectorAll('[data-action="view"]').forEach((card) => {
@@ -399,9 +400,13 @@ function bindWordActions() {
       }
     });
   });
-  document.querySelectorAll('[data-action="info"]').forEach((button) =>
-    button.addEventListener("click", () => showWordDetails(button.dataset.id)),
-  );
+  document
+    .querySelectorAll('[data-action="info"]')
+    .forEach((button) =>
+      button.addEventListener("click", () =>
+        showWordDetails(button.dataset.id),
+      ),
+    );
   document
     .querySelectorAll('[data-action="edit"]')
     .forEach((button) =>
@@ -433,13 +438,11 @@ function bindWordActions() {
         window.alert("The database is unavailable. The word was not deleted.");
       }
     });
-  document
-    .querySelectorAll("dialog")
-    .forEach((dialog) =>
-      dialog.addEventListener("click", (event) => {
-        if (event.target === dialog) dialog.close();
-      }),
-    );
+  document.querySelectorAll("dialog").forEach((dialog) =>
+    dialog.addEventListener("click", (event) => {
+      if (event.target === dialog) dialog.close();
+    }),
+  );
   document
     .querySelectorAll('[data-action="close-detail"]')
     .forEach((button) =>
