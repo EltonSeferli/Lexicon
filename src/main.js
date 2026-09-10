@@ -32,6 +32,8 @@ let synonymFeedback = null;
 let nextWordTimer = null;
 let nextWordCountdown = 0;
 let editingId = null;
+let currentPage = 1;
+const pageSize = 8;
 
 const app = document.querySelector("#app");
 const normalizeSynonyms = (synonyms) =>
@@ -104,6 +106,12 @@ const pickQuizWord = () => {
 
 function render() {
   const filtered = matchingWords();
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  currentPage = Math.min(currentPage, pageCount);
+  const visibleWords = filtered.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  );
   app.innerHTML = `
     <header class="border-b border-slate-200 bg-white/85">
       <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 lg:px-8">
@@ -120,7 +128,8 @@ function render() {
         <div class="library-panel rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
           <div class="mb-6 flex flex-wrap items-end justify-between gap-4"><div><p class="mb-1 text-xs font-bold uppercase tracking-[0.16em] text-indigo-600">YOUR LIBRARY</p><h2 class="text-2xl font-bold tracking-tight text-slate-900">Saved words <span class="ml-1 text-sm font-medium text-slate-400">${words.length}</span></h2></div><button class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700" data-action="open-add"><span class="text-lg leading-none">+</span> Add new word</button></div>
           <label class="mb-5 flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-slate-400 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100"><span>⌕</span><input class="w-full bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400" id="search" type="search" value="${escapeHtml(searchTerm)}" placeholder="Search words, definitions, or synonyms..."><kbd class="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px]">/</kbd></label>
-          <div class="space-y-3" id="word-list">${filtered.length ? filtered.map(wordCard).join("") : emptySearchState()}</div>
+          <div class="space-y-3" id="word-list">${filtered.length ? visibleWords.map(wordCard).join("") : emptySearchState()}</div>
+          ${filtered.length > pageSize ? pagination(pageCount) : ""}
         </div>
         <aside class="rounded-2xl bg-indigo-600 p-5 text-white shadow-lg shadow-indigo-100 sm:p-7">
           <div class="mb-7 flex items-center justify-between"><div class="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-indigo-100"><span class="h-2 w-2 rounded-full bg-emerald-300"></span> Flashcard quiz</div><span class="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-indigo-100">${words.length ? "Ready" : "Empty"}</span></div>
@@ -129,12 +138,15 @@ function render() {
       </section>
     </main>
     <footer class="mx-auto flex max-w-7xl justify-between px-5 pb-7 text-xs text-slate-400 lg:px-8"><span>Saved automatically</span><span>Personal study space</span></footer>
-    ${wordDialog()}`;
+    ${wordDialog()}${wordDetailDialog()}${deleteDialog()}`;
   bindEvents();
 }
 
 function wordCard({ id, word, definition, synonyms }) {
-  return `<article class="word-card group rounded-xl border border-slate-200 p-4 transition hover:border-indigo-300 hover:shadow-sm"><div class="flex items-start justify-between gap-4"><div class="min-w-0"><h3 class="truncate text-lg font-bold text-slate-900">${escapeHtml(word)}</h3><p class="mt-1 text-xs font-semibold text-indigo-600">${escapeHtml(synonyms.join(", "))}</p></div><div class="flex shrink-0 gap-1 opacity-0 transition group-hover:opacity-100"><button class="rounded-md p-2 text-slate-400 hover:bg-slate-100 hover:text-indigo-600" data-action="edit" data-id="${id}" aria-label="Edit ${escapeHtml(word)}">✎</button><button class="rounded-md p-2 text-slate-400 hover:bg-red-50 hover:text-red-500" data-action="delete" data-id="${id}" aria-label="Delete ${escapeHtml(word)}">×</button></div></div><p class="mt-3 text-sm leading-6 text-slate-500">${escapeHtml(definition)}</p></article>`;
+  return `<article class="word-card group cursor-pointer rounded-xl border border-slate-200 p-4 transition hover:border-indigo-300 hover:shadow-sm" data-action="view" data-id="${id}" tabindex="0" role="button" aria-label="View ${escapeHtml(word)}"><div class="flex items-start justify-between gap-4"><div class="min-w-0"><h3 class="truncate text-lg font-bold text-slate-900">${escapeHtml(word)}</h3><p class="mt-1 text-xs font-semibold text-indigo-600">${escapeHtml(synonyms.join(", "))}</p></div><div class="flex shrink-0 gap-1 opacity-0 transition group-hover:opacity-100"><button class="rounded-md p-2 text-slate-400 hover:bg-slate-100 hover:text-indigo-600" data-action="edit" data-id="${id}" aria-label="Edit ${escapeHtml(word)}">✎</button><button class="rounded-md p-2 text-slate-400 hover:bg-red-50 hover:text-red-500" data-action="delete" data-id="${id}" aria-label="Delete ${escapeHtml(word)}">×</button></div></div><p class="mt-3 text-sm leading-6 text-slate-500">${escapeHtml(definition)}</p></article>`;
+}
+function pagination(pageCount) {
+  return `<nav class="mt-5 flex items-center justify-between border-t border-slate-200/20 pt-4" aria-label="Word pages"><button class="rounded-md border border-slate-200/30 px-3 py-2 text-xs font-bold text-slate-300 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40" data-action="previous-page" ${currentPage === 1 ? "disabled" : ""}>Previous</button><span class="text-xs font-semibold text-slate-400">Page ${currentPage} of ${pageCount}</span><button class="rounded-md border border-slate-200/30 px-3 py-2 text-xs font-bold text-slate-300 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40" data-action="next-page" ${currentPage === pageCount ? "disabled" : ""}>Next</button></nav>`;
 }
 function emptySearchState() {
   return '<div class="py-12 text-center"><p class="text-sm font-semibold text-slate-700">No words found</p><p class="mt-1 text-sm text-slate-400">Try another search or add a new word.</p></div>';
@@ -159,6 +171,12 @@ function synonymQuiz() {
 }
 function wordDialog() {
   return `<dialog id="word-dialog" class="w-[min(440px,calc(100%-2rem))] rounded-2xl border-0 bg-white p-0 shadow-2xl backdrop:bg-slate-950/40"><form id="word-form" class="p-6 sm:p-8"><div class="mb-7 flex items-start justify-between"><div><p class="mb-1 text-xs font-bold uppercase tracking-[0.16em] text-indigo-600">WORD ENTRY</p><h2 class="text-2xl font-bold text-slate-900" id="dialog-title">Add new word</h2></div><button class="rounded-lg p-2 text-xl leading-none text-slate-400 hover:bg-slate-100" type="button" data-action="close-dialog" aria-label="Close">×</button></div><input id="word-id" type="hidden"><label class="mb-4 block text-xs font-bold uppercase tracking-wider text-slate-500">Word<input class="mt-2 w-full rounded-lg border border-slate-200 px-3.5 py-3 text-sm font-normal normal-case tracking-normal text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" id="word-input" required placeholder="e.g. Serendipity"></label><label class="mb-4 block text-xs font-bold uppercase tracking-wider text-slate-500">Definition<textarea class="mt-2 min-h-24 w-full resize-y rounded-lg border border-slate-200 px-3.5 py-3 text-sm font-normal normal-case tracking-normal text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100" id="definition-input" required placeholder="What does it mean?"></textarea></label><fieldset class="mb-6"><legend class="text-xs font-bold uppercase tracking-wider text-slate-500">Synonyms <span class="font-normal normal-case tracking-normal text-slate-400">Press Tab for another</span></legend><div class="mt-2 space-y-2" id="synonym-fields"></div></fieldset><button class="flex w-full items-center justify-between rounded-lg bg-indigo-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-indigo-700" type="submit">Save word <span class="text-lg">→</span></button></form></dialog>`;
+}
+function wordDetailDialog() {
+  return `<dialog id="word-detail-dialog" class="w-[min(440px,calc(100%-2rem))] rounded-2xl border-0 bg-white p-0 shadow-2xl backdrop:bg-slate-950/40"><div class="p-6 sm:p-8"><div class="mb-7 flex items-start justify-between"><div><p class="mb-1 text-xs font-bold uppercase tracking-[0.16em] text-indigo-600">WORD DETAILS</p><h2 class="text-2xl font-bold text-slate-900" id="detail-word"></h2></div><button class="rounded-lg p-2 text-xl leading-none text-slate-400 hover:bg-slate-100" type="button" data-action="close-detail" aria-label="Close">×</button></div><p class="text-sm leading-7 text-slate-600" id="detail-definition"></p><div class="mt-6"><p class="text-xs font-bold uppercase tracking-wider text-slate-500">Synonyms</p><p class="mt-2 text-sm font-semibold text-indigo-600" id="detail-synonyms"></p></div></div></dialog>`;
+}
+function deleteDialog() {
+  return `<dialog id="delete-dialog" class="w-[min(400px,calc(100%-2rem))] rounded-2xl border-0 bg-white p-0 shadow-2xl backdrop:bg-slate-950/40"><div class="p-6 sm:p-8"><div class="mb-6 flex items-start justify-between"><div><p class="mb-1 text-xs font-bold uppercase tracking-[0.16em] text-red-500">DELETE WORD</p><h2 class="text-2xl font-bold text-slate-900">Are you sure?</h2></div><button class="rounded-lg p-2 text-xl leading-none text-slate-400 hover:bg-slate-100" type="button" data-action="close-delete" aria-label="Close">×</button></div><p class="text-sm leading-6 text-slate-500">This word will be removed from your library.</p><div class="mt-7 flex justify-end gap-3"><button class="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50" type="button" data-action="close-delete">Cancel</button><button class="rounded-lg bg-red-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-600" type="button" data-action="confirm-delete">Delete</button></div></div></dialog>`;
 }
 
 function openDialog(word = null) {
@@ -252,11 +270,8 @@ function startNextWordCountdown() {
 function bindEvents() {
   document.querySelector("#search").addEventListener("input", (event) => {
     searchTerm = event.target.value;
-    const filtered = matchingWords();
-    document.querySelector("#word-list").innerHTML = filtered.length
-      ? filtered.map(wordCard).join("")
-      : emptySearchState();
-    bindWordActions();
+    currentPage = 1;
+    render();
   });
   document
     .querySelector('[data-action="open-add"]')
@@ -267,6 +282,18 @@ function bindEvents() {
       document.querySelector("#word-dialog").close(),
     );
   bindWordActions();
+  document
+    .querySelector('[data-action="previous-page"]')
+    ?.addEventListener("click", () => {
+      currentPage -= 1;
+      render();
+    });
+  document
+    .querySelector('[data-action="next-page"]')
+    ?.addEventListener("click", () => {
+      currentPage += 1;
+      render();
+    });
   document
     .querySelector('[data-action="start-quiz"]')
     ?.addEventListener("click", () => {
@@ -346,6 +373,26 @@ function bindEvents() {
 }
 
 function bindWordActions() {
+  document.querySelectorAll('[data-action="view"]').forEach((card) => {
+    const openDetails = () => {
+      const word = words.find((entry) => String(entry.id) === card.dataset.id);
+      if (!word) return;
+      document.querySelector("#detail-word").textContent = word.word;
+      document.querySelector("#detail-definition").textContent = word.definition;
+      document.querySelector("#detail-synonyms").textContent = word.synonyms.join(", ");
+      document.querySelector("#word-detail-dialog").showModal();
+    };
+    card.addEventListener("click", (event) => {
+      if (event.target.closest("button")) return;
+      openDetails();
+    });
+    card.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openDetails();
+      }
+    });
+  });
   document
     .querySelectorAll('[data-action="edit"]')
     .forEach((button) =>
@@ -354,20 +401,50 @@ function bindWordActions() {
       ),
     );
   document.querySelectorAll('[data-action="delete"]').forEach((button) =>
-    button.addEventListener("click", async () => {
-      const id = button.dataset.id;
+    button.addEventListener("click", () => {
+      const dialog = document.querySelector("#delete-dialog");
+      dialog.dataset.id = button.dataset.id;
+      dialog.showModal();
+    }),
+  );
+  document
+    .querySelector('[data-action="confirm-delete"]')
+    ?.addEventListener("click", async () => {
+      const dialog = document.querySelector("#delete-dialog");
+      const id = dialog.dataset.id;
       try {
         if (databaseConnected)
           await apiRequest(`/words/${id}`, { method: "DELETE" });
         words = words.filter((word) => String(word.id) !== id);
         saveWords();
         if (quizWord && String(quizWord.id) === id) pickQuizWord();
+        dialog.close();
         render();
       } catch (error) {
         window.alert("The database is unavailable. The word was not deleted.");
       }
-    }),
-  );
+    });
+  document
+    .querySelectorAll("dialog")
+    .forEach((dialog) =>
+      dialog.addEventListener("click", (event) => {
+        if (event.target === dialog) dialog.close();
+      }),
+    );
+  document
+    .querySelectorAll('[data-action="close-detail"]')
+    .forEach((button) =>
+      button.addEventListener("click", () =>
+        document.querySelector("#word-detail-dialog").close(),
+      ),
+    );
+  document
+    .querySelectorAll('[data-action="close-delete"]')
+    .forEach((button) =>
+      button.addEventListener("click", () =>
+        document.querySelector("#delete-dialog").close(),
+      ),
+    );
 }
 
 if (!quizWord && words.length) pickQuizWord();
