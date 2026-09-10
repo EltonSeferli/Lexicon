@@ -42,6 +42,7 @@ let words = JSON.parse(localStorage.getItem(storageKey)) || starterWords;
 let progressEntries =
   JSON.parse(localStorage.getItem(progressStorageKey)) || [];
 let databaseConnected = false;
+let progressDatabaseConnected = false;
 let currentView = getRoute();
 let progressSkillFilter = "all";
 let searchTerm = "";
@@ -130,6 +131,36 @@ async function loadWordsFromDatabase() {
   } catch (error) {
     databaseConnected = false;
     render();
+  }
+}
+async function loadProgressFromDatabase() {
+  try {
+    const remoteEntries = await apiRequest("/progress");
+    progressDatabaseConnected = true;
+    if (!remoteEntries.length && progressEntries.length) {
+      const migratedEntries = await Promise.all(
+        progressEntries.map((entry) =>
+          apiRequest("/progress", {
+            method: "POST",
+            body: JSON.stringify({
+              title: entry.title,
+              skill: entry.skill,
+              band: entry.band ?? entry.score,
+              note: entry.note,
+              image: entry.image,
+            }),
+          }),
+        ),
+      );
+      progressEntries = migratedEntries;
+    } else {
+      progressEntries = remoteEntries;
+    }
+    saveProgress();
+    if (currentView === "progress") render();
+  } catch (error) {
+    progressDatabaseConnected = false;
+    if (currentView === "progress") render();
   }
 }
 const matchingWords = () =>
@@ -289,7 +320,7 @@ function bindProgressEvents() {
     });
   document
     .querySelector("#progress-form")
-    ?.addEventListener("submit", (event) => {
+    ?.addEventListener("submit", async (event) => {
       event.preventDefault();
       const image = document.querySelector("#progress-preview").src;
       const editingId = dialog.dataset.editingId;
@@ -305,11 +336,31 @@ function bindProgressEvents() {
         image: image || existingEntry?.image || "",
         createdAt: existingEntry?.createdAt || new Date().toISOString(),
       };
-      progressEntries = existingEntry
-        ? progressEntries.map((item) =>
-            item.id === existingEntry.id ? entry : item,
-          )
-        : [entry, ...progressEntries];
+      try {
+        if (progressDatabaseConnected) {
+          const savedEntry = await apiRequest(
+            existingEntry ? `/progress/${existingEntry.id}` : "/progress",
+            {
+              method: existingEntry ? "PUT" : "POST",
+              body: JSON.stringify(entry),
+            },
+          );
+          progressEntries = existingEntry
+            ? progressEntries.map((item) =>
+                item.id === existingEntry.id ? savedEntry : item,
+              )
+            : [savedEntry, ...progressEntries];
+        } else {
+          progressEntries = existingEntry
+            ? progressEntries.map((item) =>
+                item.id === existingEntry.id ? entry : item,
+              )
+            : [entry, ...progressEntries];
+        }
+      } catch (error) {
+        window.alert(`${error.message} Your progress was not saved.`);
+        return;
+      }
       saveProgress();
       dialog.close();
       render();
@@ -328,11 +379,18 @@ function bindProgressEvents() {
     );
   document
     .querySelector('[data-action="delete-progress"]')
-    ?.addEventListener("click", () => {
+    ?.addEventListener("click", async () => {
       const id = document.querySelector("#progress-detail-dialog").dataset.id;
-      progressEntries = progressEntries.filter(
-        (entry) => String(entry.id) !== id,
-      );
+      try {
+        if (progressDatabaseConnected)
+          await apiRequest(`/progress/${id}`, { method: "DELETE" });
+        progressEntries = progressEntries.filter(
+          (entry) => String(entry.id) !== id,
+        );
+      } catch (error) {
+        window.alert(`${error.message} The progress was not deleted.`);
+        return;
+      }
       saveProgress();
       document.querySelector("#progress-detail-dialog").close();
       render();
@@ -358,10 +416,17 @@ function openProgressDetails(id) {
     .addEventListener("click", () => dialog.close());
   document
     .querySelector('[data-action="delete-progress"]')
-    .addEventListener("click", () => {
-      progressEntries = progressEntries.filter(
-        (item) => String(item.id) !== id,
-      );
+    .addEventListener("click", async () => {
+      try {
+        if (progressDatabaseConnected)
+          await apiRequest(`/progress/${id}`, { method: "DELETE" });
+        progressEntries = progressEntries.filter(
+          (item) => String(item.id) !== id,
+        );
+      } catch (error) {
+        window.alert(`${error.message} The progress was not deleted.`);
+        return;
+      }
       saveProgress();
       dialog.close();
       render();
@@ -697,3 +762,4 @@ subscribeToRoute((route) => {
 });
 render();
 loadWordsFromDatabase();
+loadProgressFromDatabase();

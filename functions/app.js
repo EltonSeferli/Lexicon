@@ -5,11 +5,12 @@ const app = express();
 const databaseName = process.env.MONGODB_DB || "lexicon";
 let mongoClient;
 let wordsCollection;
+let progressCollection;
 let initializationPromise;
 
 app.disable("x-powered-by");
 app.set("trust proxy", 1);
-app.use(express.json());
+app.use(express.json({ limit: "12mb" }));
 
 async function initializeDatabase() {
   if (initializationPromise) return initializationPromise;
@@ -20,7 +21,9 @@ async function initializeDatabase() {
     await mongoClient.connect();
     const database = mongoClient.db(databaseName);
     wordsCollection = database.collection("words");
+    progressCollection = database.collection("progress");
     await wordsCollection.createIndex({ createdAt: -1 });
+    await progressCollection.createIndex({ createdAt: -1 });
   })().catch((error) => {
     initializationPromise = undefined;
     throw error;
@@ -35,9 +38,36 @@ const serializeWord = ({ _id, word, definition, synonyms }) => ({
   definition,
   synonyms,
 });
+const serializeProgress = ({
+  _id,
+  title,
+  skill,
+  band,
+  note,
+  image,
+  createdAt,
+}) => ({
+  id: _id.toString(),
+  title,
+  skill,
+  band,
+  note,
+  image,
+  createdAt,
+});
 
 const parseId = (value) =>
   ObjectId.isValid(value) ? new ObjectId(value) : null;
+
+const normalizeProgressInput = (body = {}) => ({
+  title: typeof body.title === "string" ? body.title.trim() : "",
+  skill: ["Reading", "Writing", "Speaking", "Listening"].includes(body.skill)
+    ? body.skill
+    : "",
+  band: Number.isFinite(Number(body.band)) ? Number(body.band) : null,
+  note: typeof body.note === "string" ? body.note.trim() : "",
+  image: typeof body.image === "string" ? body.image : "",
+});
 
 app.get("/api/health", async (_request, response) => {
   try {
@@ -61,6 +91,82 @@ app.get("/api/words", async (_request, response) => {
   } catch (error) {
     console.error("GET /api/words failed:", error.message);
     response.status(500).json({ error: "Unable to load words" });
+  }
+});
+
+app.get("/api/progress", async (_request, response) => {
+  try {
+    await initializeDatabase();
+    const entries = await progressCollection
+      .find({})
+      .sort({ createdAt: -1, _id: -1 })
+      .toArray();
+    response.json(entries.map(serializeProgress));
+  } catch (error) {
+    console.error("GET /api/progress failed:", error.message);
+    response.status(500).json({ error: "Unable to load progress" });
+  }
+});
+
+app.post("/api/progress", async (request, response) => {
+  const entry = normalizeProgressInput(request.body);
+  if (!entry.title || !entry.skill || entry.band === null) {
+    return response
+      .status(400)
+      .json({ error: "Title, skill, and band score are required" });
+  }
+
+  try {
+    await initializeDatabase();
+    const document = { ...entry, createdAt: new Date(), updatedAt: new Date() };
+    const result = await progressCollection.insertOne(document);
+    response
+      .status(201)
+      .json(serializeProgress({ ...document, _id: result.insertedId }));
+  } catch (error) {
+    console.error("POST /api/progress failed:", error.message);
+    response.status(500).json({ error: "Unable to save progress" });
+  }
+});
+
+app.put("/api/progress/:id", async (request, response) => {
+  const entry = normalizeProgressInput(request.body);
+  if (!entry.title || !entry.skill || entry.band === null) {
+    return response
+      .status(400)
+      .json({ error: "Title, skill, and band score are required" });
+  }
+
+  try {
+    await initializeDatabase();
+    const id = parseId(request.params.id);
+    if (!id) return response.status(404).json({ error: "Progress not found" });
+    const result = await progressCollection.updateOne(
+      { _id: id },
+      { $set: { ...entry, updatedAt: new Date() } },
+    );
+    if (!result.matchedCount)
+      return response.status(404).json({ error: "Progress not found" });
+    const updatedEntry = await progressCollection.findOne({ _id: id });
+    response.json(serializeProgress(updatedEntry));
+  } catch (error) {
+    console.error("PUT /api/progress/:id failed:", error.message);
+    response.status(500).json({ error: "Unable to update progress" });
+  }
+});
+
+app.delete("/api/progress/:id", async (request, response) => {
+  try {
+    await initializeDatabase();
+    const id = parseId(request.params.id);
+    if (!id) return response.status(404).json({ error: "Progress not found" });
+    const result = await progressCollection.deleteOne({ _id: id });
+    if (!result.deletedCount)
+      return response.status(404).json({ error: "Progress not found" });
+    response.status(204).end();
+  } catch (error) {
+    console.error("DELETE /api/progress/:id failed:", error.message);
+    response.status(500).json({ error: "Unable to delete progress" });
   }
 });
 

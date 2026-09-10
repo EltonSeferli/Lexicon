@@ -9,9 +9,16 @@ Lexicon is a vocabulary flashcard app with an Express API and MongoDB persistenc
 3. Start the API and Vite together with `npm run dev`.
 4. Open `http://localhost:5173`.
 
-The API connects with the MongoDB Node.js driver and creates the `words`
-collection and its `createdAt` index on startup. Keep the Atlas connection
-string in `MONGODB_URI`; do not commit it.
+The API connects with the MongoDB Node.js driver and creates the `words` and
+`progress` collections with their `createdAt` indexes on startup. Progress
+documents contain the title, IELTS skill, band, note, screenshot data URL, and
+timestamps. Keep the Atlas connection string in `MONGODB_URI`; do not commit
+it.
+
+Progress entries use MongoDB through `/api/progress` for loading, creating,
+editing, and deleting. If the API is unavailable, the browser temporarily uses
+`localStorage`. When the database is available and the remote progress
+collection is empty, existing local entries are migrated automatically.
 
 ## Production deployment
 
