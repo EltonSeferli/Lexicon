@@ -107,14 +107,20 @@ app.get("/api/words", async (_request, response) => {
   }
 });
 
+const normalizeWordInput = (body = {}) => ({
+  word: typeof body.word === "string" ? body.word.trim() : "",
+  definition: typeof body.definition === "string" ? body.definition.trim() : "",
+  synonyms: Array.isArray(body.synonyms)
+    ? body.synonyms
+        .filter((synonym) => typeof synonym === "string")
+        .map((synonym) => synonym.trim())
+        .filter(Boolean)
+    : [],
+});
+
 app.post("/api/words", async (request, response) => {
-  const { word, definition, synonyms } = request.body;
-  if (
-    !word?.trim() ||
-    !definition?.trim() ||
-    !Array.isArray(synonyms) ||
-    !synonyms.length
-  ) {
+  const { word, definition, synonyms } = normalizeWordInput(request.body);
+  if (!word || !definition || !synonyms.length) {
     return response
       .status(400)
       .json({ error: "Word, definition, and synonyms are required" });
@@ -143,13 +149,8 @@ app.post("/api/words", async (request, response) => {
 });
 
 app.put("/api/words/:id", async (request, response) => {
-  const { word, definition, synonyms } = request.body;
-  if (
-    !word?.trim() ||
-    !definition?.trim() ||
-    !Array.isArray(synonyms) ||
-    !synonyms.length
-  ) {
+  const { word, definition, synonyms } = normalizeWordInput(request.body);
+  if (!word || !definition || !synonyms.length) {
     return response
       .status(400)
       .json({ error: "Word, definition, and synonyms are required" });
@@ -158,14 +159,7 @@ app.put("/api/words/:id", async (request, response) => {
   try {
     const [result] = await pool.execute(
       "UPDATE words SET word = ?, definition = ?, synonyms = ? WHERE id = ?",
-      [
-        word.trim(),
-        definition.trim(),
-        JSON.stringify(
-          synonyms.map((synonym) => synonym.trim()).filter(Boolean),
-        ),
-        request.params.id,
-      ],
+      [word, definition, JSON.stringify(synonyms), request.params.id],
     );
     if (!result.affectedRows)
       return response.status(404).json({ error: "Word not found" });
@@ -198,7 +192,9 @@ if (isProduction) {
   app.use(express.static(path.join(publicDirectory, "dist"), { maxAge: "1d" }));
   app.use((request, response, next) => {
     if (request.method === "GET" && !request.path.startsWith("/api")) {
-      return response.sendFile(path.join(publicDirectory, "dist", "index.html"));
+      return response.sendFile(
+        path.join(publicDirectory, "dist", "index.html"),
+      );
     }
     next();
   });

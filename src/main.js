@@ -59,7 +59,12 @@ const apiRequest = async (path, options = {}) => {
     headers: { "Content-Type": "application/json" },
     ...options,
   });
-  if (!response.ok) throw new Error(`API request failed: ${response.status}`);
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(
+      errorBody.error || `API request failed: ${response.status}`,
+    );
+  }
   return response.status === 204 ? null : response.json();
 };
 async function loadWordsFromDatabase() {
@@ -316,6 +321,10 @@ function bindEvents() {
           .map((input) => input.value.trim())
           .filter(Boolean),
       };
+      if (!entry.word || !entry.definition || !entry.synonyms.length) {
+        window.alert("Enter a word, definition, and at least one synonym.");
+        return;
+      }
       try {
         const savedEntry = databaseConnected
           ? await apiRequest(editingId ? `/words/${editingId}` : "/words", {
@@ -331,7 +340,7 @@ function bindEvents() {
         if (!quizWord) pickQuizWord();
         render();
       } catch (error) {
-        window.alert("The database is unavailable. Your word was not saved.");
+        window.alert(`${error.message} Your word was not saved.`);
       }
     });
 }

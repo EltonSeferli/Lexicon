@@ -42,6 +42,38 @@ docker run --env-file .env -p 3001:3001 lexicon
 Set `NODE_ENV=production` and point the container's database variables at a
 managed MySQL instance. Do not commit `.env` or database credentials.
 
+### Firebase Hosting + Cloud Run
+
+Firebase Hosting serves the frontend, while Cloud Run runs the Express API.
+The included `firebase.json` forwards `/api/**` to the Cloud Run service
+`lexicon-api`, keeping browser requests same-origin.
+
+1. Install the Firebase CLI: `npm install -g firebase-tools`.
+2. Create or select a Google Cloud project in Firebase Console, then run
+   `firebase login` and `firebase use YOUR_FIREBASE_PROJECT_ID`.
+3. Enable billing and enable the Cloud Run and Firebase Hosting APIs.
+4. Build and deploy the API from this folder:
+
+   ```sh
+   gcloud run deploy lexicon-api --source . --region us-central1 --allow-unauthenticated
+   ```
+
+   Set these Cloud Run environment variables during deployment:
+   `NODE_ENV=production`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and
+   `DB_PASSWORD`. Store the database password as a Secret Manager secret for a
+   production deployment rather than putting it directly in shell history.
+
+5. Deploy Firebase Hosting:
+
+   ```sh
+   firebase deploy --only hosting
+   ```
+
+6. Verify `https://YOUR_PROJECT_ID.web.app/api/health` returns `{ "ok": true }`.
+
+The Cloud Run service must be named `lexicon-api` and deployed in
+`us-central1`, or update those values in `firebase.json` before deploying.
+
 ## Database operations
 
 The API performs idempotent startup initialization for the database and table.
