@@ -3,9 +3,13 @@ import { defineSecret } from "firebase-functions/params";
 import { app, initializeDatabase } from "./app.js";
 
 const mongodbUri = defineSecret("MONGODB_URI");
+const defaultUserPassword = defineSecret("DEFAULT_USER_PASSWORD");
 
 export const api = onRequest(
-  { region: "us-central1", secrets: [mongodbUri] },
+  {
+    region: "us-central1",
+    secrets: [mongodbUri, defaultUserPassword],
+  },
   async (request, response) => {
     try {
       await initializeDatabase();

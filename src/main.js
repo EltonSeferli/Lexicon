@@ -13,6 +13,7 @@ import {
   progressFilter as renderProgressFilter,
   filteredProgressEmptyState as renderFilteredProgressEmptyState,
 } from "./components/progress.js";
+import { authPage as renderAuthPage } from "./components/auth.js";
 import { getRoute, navigate, subscribeToRoute } from "./router.js";
 
 const storageKey = "lexicon-words";
@@ -43,6 +44,8 @@ let progressEntries =
   JSON.parse(localStorage.getItem(progressStorageKey)) || [];
 let databaseConnected = false;
 let progressDatabaseConnected = false;
+let currentUser = null;
+let authMode = "login";
 let currentView = getRoute();
 let progressSkillFilter = "all";
 let searchTerm = "";
@@ -111,8 +114,20 @@ const latestSkillBands = (entries) => {
 const apiRequest = async (path, options = {}) => {
   const response = await fetch(`/api${path}`, {
     headers: { "Content-Type": "application/json" },
+    credentials: "include",
     ...options,
   });
+  if (response.status === 401 && !path.startsWith("/auth/")) {
+    const refreshResponse = await fetch("/api/auth/refresh", {
+      method: "POST",
+      credentials: "include",
+    });
+    if (refreshResponse.ok)
+      return apiRequest(path, {
+        ...options,
+        headers: { "Content-Type": "application/json" },
+      });
+  }
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
     throw new Error(
@@ -121,6 +136,79 @@ const apiRequest = async (path, options = {}) => {
   }
   return response.status === 204 ? null : response.json();
 };
+function renderAuth(errorMessage = "") {
+  app.innerHTML = renderAuthPage(authMode);
+  const error = document.querySelector("#auth-error");
+  if (error) error.textContent = errorMessage;
+  document
+    .querySelectorAll('[data-action="toggle-password"]')
+    .forEach((button) => {
+      button.addEventListener("click", () => {
+        const input = button.parentElement.querySelector("input");
+        const isVisible = input.type === "text";
+        input.type = isVisible ? "password" : "text";
+        button.textContent = isVisible ? "◉" : "◌";
+        button.setAttribute(
+          "aria-label",
+          `${isVisible ? "Show" : "Hide"} password`,
+        );
+        button.setAttribute("title", `${isVisible ? "Show" : "Hide"} password`);
+      });
+    });
+  document
+    .querySelector("#auth-form")
+    ?.addEventListener("submit", handleAuthSubmit);
+  document
+    .querySelector('[data-action="auth-switch"]')
+    ?.addEventListener("click", () => {
+      authMode = document.querySelector('[data-action="auth-switch"]').dataset
+        .mode;
+      renderAuth();
+    });
+}
+async function handleAuthSubmit(event) {
+  event.preventDefault();
+  const email = document
+    .querySelector("#auth-email")
+    .value.trim()
+    .toLowerCase();
+  try {
+    const password = document.querySelector("#auth-password").value;
+    const payload = { email, password };
+    if (authMode === "register") {
+      const confirmPassword = document.querySelector(
+        "#auth-confirm-password",
+      ).value;
+      if (password !== confirmPassword)
+        throw new Error("Passwords do not match");
+      payload.fullName = document.querySelector("#auth-full-name").value.trim();
+    }
+    await apiRequest(
+      authMode === "register" ? "/auth/register" : "/auth/login",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    );
+    currentUser = await apiRequest("/auth/me");
+    render();
+    loadWordsFromDatabase();
+    loadProgressFromDatabase();
+  } catch (error) {
+    renderAuth(error.message);
+  }
+}
+async function loadCurrentUser() {
+  try {
+    currentUser = await apiRequest("/auth/me");
+    render();
+    loadWordsFromDatabase();
+    loadProgressFromDatabase();
+  } catch (error) {
+    currentUser = null;
+    renderAuth();
+  }
+}
 async function loadWordsFromDatabase() {
   try {
     words = await apiRequest("/words");
@@ -187,6 +275,10 @@ const pickQuizWord = () => {
 };
 
 function render() {
+  if (!currentUser) {
+    renderAuth();
+    return;
+  }
   if (currentView === "progress") {
     renderProgress();
     return;
@@ -202,7 +294,7 @@ function render() {
     <header class="border-b border-slate-200 bg-white/85">
       <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 lg:px-8">
         <div class="flex items-center gap-6"><a class="flex items-center gap-2.5 text-lg font-bold tracking-tight text-slate-900" href="#"><img class="h-8 w-8" src="/logo.svg" alt="Lexicon logo">Lexicon</a><nav class="flex items-center gap-1 rounded-lg bg-slate-800/80 p-1" aria-label="Main navigation"><button class="rounded-md px-3 py-1.5 text-xs font-bold ${currentView === "library" ? "bg-indigo-500 text-white" : "text-slate-400 hover:text-white"}" data-action="show-library">Library</button><button class="rounded-md px-3 py-1.5 text-xs font-bold ${currentView === "progress" ? "bg-indigo-500 text-white" : "text-slate-400 hover:text-white"}" data-action="show-progress">Progress</button></nav></div>
-        <span class="hidden text-xs font-medium text-slate-500 sm:block">${databaseConnected ? "MongoDB connected" : "Local cache mode"}</span>
+        <div class="flex items-center gap-3"><span class="hidden text-xs font-medium text-slate-500 sm:block">${databaseConnected ? "MongoDB connected" : "Local cache mode"}</span><button class="text-xs font-bold text-slate-400 hover:text-white" data-action="logout">Log out</button></div>
       </div>
     </header>
     <main class="mx-auto max-w-7xl px-5 py-8 lg:px-8 lg:py-12">
@@ -244,7 +336,7 @@ function renderProgress() {
     <header class="border-b border-slate-200 bg-white/85">
       <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 lg:px-8">
         <div class="flex items-center gap-6"><a class="flex items-center gap-2.5 text-lg font-bold tracking-tight text-slate-900" href="#"><img class="h-8 w-8" src="/logo.svg" alt="Lexicon logo">Lexicon</a><nav class="flex items-center gap-1 rounded-lg bg-slate-800/80 p-1" aria-label="Main navigation"><button class="rounded-md px-3 py-1.5 text-xs font-bold text-slate-400 hover:text-white" data-action="show-library">Library</button><button class="rounded-md bg-indigo-500 px-3 py-1.5 text-xs font-bold text-white" data-action="show-progress">Progress</button></nav></div>
-        <span class="hidden text-xs font-medium text-slate-500 sm:block">${entries.length} ${entries.length === 1 ? "entry" : "entries"}</span>
+        <div class="flex items-center gap-3"><span class="hidden text-xs font-medium text-slate-500 sm:block">${entries.length} ${entries.length === 1 ? "entry" : "entries"}</span><button class="text-xs font-bold text-slate-400 hover:text-white" data-action="logout">Log out</button></div>
       </div>
     </header>
     <main class="progress-page mx-auto max-w-7xl px-5 py-8 lg:px-8 lg:py-12">
@@ -267,6 +359,14 @@ function bindNavigation() {
     .querySelector('[data-action="show-progress"]')
     ?.addEventListener("click", () => {
       navigate("progress");
+    });
+  document
+    .querySelector('[data-action="logout"]')
+    ?.addEventListener("click", async () => {
+      await apiRequest("/auth/logout", { method: "POST" }).catch(() => {});
+      currentUser = null;
+      authMode = "login";
+      renderAuth();
     });
 }
 
@@ -758,8 +858,6 @@ function bindWordActions() {
 if (!quizWord && words.length) pickQuizWord();
 subscribeToRoute((route) => {
   currentView = route;
-  render();
+  if (currentUser) render();
 });
-render();
-loadWordsFromDatabase();
-loadProgressFromDatabase();
+loadCurrentUser();

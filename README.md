@@ -9,11 +9,23 @@ Lexicon is a vocabulary flashcard app with an Express API and MongoDB persistenc
 3. Start the API and Vite together with `npm run dev`.
 4. Open `http://localhost:5173`.
 
+Authentication requires `DEFAULT_USER_PASSWORD` in `.env`. The seeded default
+account is `DEFAULT_USER_EMAIL` (set to `eltonseferli25@gmail.com` in the
+example) with the full name `Elton Safarli`. Registration requires full name,
+email, password, and password confirmation. Login uses email and password
+directly; email verification codes are not used.
+
 The API connects with the MongoDB Node.js driver and creates the `words` and
 `progress` collections with their `createdAt` indexes on startup. Progress
 documents contain the title, IELTS skill, band, note, screenshot data URL, and
 timestamps. Keep the Atlas connection string in `MONGODB_URI`; do not commit
 it.
+
+Authentication creates `users` and `sessions` collections. Passwords are
+hashed with bcrypt, access sessions last 15 minutes, and refresh sessions last
+7 days. Existing words and progress documents without a `userId` are assigned
+to the seeded default user during startup; new documents are always scoped to
+the authenticated user.
 
 Progress entries use MongoDB through `/api/progress` for loading, creating,
 editing, and deleting. If the API is unavailable, the browser temporarily uses
