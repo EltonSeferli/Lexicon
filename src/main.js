@@ -144,7 +144,7 @@ function render() {
 }
 
 function wordCard({ id, word, definition, synonyms }) {
-  return `<article class="word-card group cursor-pointer rounded-xl border border-slate-200 p-4 transition hover:border-indigo-300 hover:shadow-sm" data-action="view" data-id="${id}" tabindex="0" role="button" aria-label="View ${escapeHtml(word)}"><div class="flex items-start justify-between gap-4"><div class="min-w-0"><h3 class="truncate text-lg font-bold text-slate-900">${escapeHtml(word)}</h3><p class="mt-1 text-xs font-semibold text-indigo-600">${escapeHtml(synonyms.join(", "))}</p></div><div class="flex shrink-0 gap-1 opacity-0 transition group-hover:opacity-100"><button class="rounded-md p-2 text-slate-400 hover:bg-slate-100 hover:text-indigo-600" data-action="info" data-id="${id}" aria-label="View details for ${escapeHtml(word)}" title="View details">ⓘ</button><button class="rounded-md p-2 text-slate-400 hover:bg-slate-100 hover:text-indigo-600" data-action="edit" data-id="${id}" aria-label="Edit ${escapeHtml(word)}" title="Edit">✎</button><button class="rounded-md p-2 text-slate-400 hover:bg-red-50 hover:text-red-500" data-action="delete" data-id="${id}" aria-label="Delete ${escapeHtml(word)}" title="Delete">×</button></div></div><p class="mt-3 text-sm leading-6 text-slate-500">${escapeHtml(definition)}</p></article>`;
+  return `<article class="word-card group rounded-xl border border-slate-200 p-4 transition hover:border-indigo-300 hover:shadow-sm"><div class="flex items-start justify-between gap-4"><div class="min-w-0"><h3 class="truncate text-lg font-bold text-slate-900">${escapeHtml(word)}</h3><p class="mt-1 text-xs font-semibold text-indigo-600">${escapeHtml(synonyms.join(", "))}</p></div><div class="flex shrink-0 gap-1 opacity-0 transition group-hover:opacity-100"><button class="rounded-md p-2 text-slate-400 hover:bg-slate-100 hover:text-indigo-600" data-action="info" data-id="${id}" aria-label="View details for ${escapeHtml(word)}" title="View details">ⓘ</button><button class="rounded-md p-2 text-slate-400 hover:bg-slate-100 hover:text-indigo-600" data-action="edit" data-id="${id}" aria-label="Edit ${escapeHtml(word)}" title="Edit">✎</button><button class="rounded-md p-2 text-slate-400 hover:bg-red-50 hover:text-red-500" data-action="delete" data-id="${id}" aria-label="Delete ${escapeHtml(word)}" title="Delete">×</button></div></div><p class="mt-3 text-sm leading-6 text-slate-500">${escapeHtml(definition)}</p></article>`;
 }
 function pagination(pageCount) {
   return `<nav class="mt-5 flex items-center justify-between border-t border-slate-200/20 pt-4" aria-label="Word pages"><button class="rounded-md border border-slate-200/30 px-3 py-2 text-xs font-bold text-slate-300 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40" data-action="previous-page" ${currentPage === 1 ? "disabled" : ""}>Previous</button><span class="text-xs font-semibold text-slate-400">Page ${currentPage} of ${pageCount}</span><button class="rounded-md border border-slate-200/30 px-3 py-2 text-xs font-bold text-slate-300 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40" data-action="next-page" ${currentPage === pageCount ? "disabled" : ""}>Next</button></nav>`;
@@ -388,18 +388,6 @@ function bindWordActions() {
       word.synonyms.join(", ");
     document.querySelector("#word-detail-dialog").showModal();
   };
-  document.querySelectorAll('[data-action="view"]').forEach((card) => {
-    card.addEventListener("click", (event) => {
-      if (event.target.closest("button")) return;
-      showWordDetails(card.dataset.id);
-    });
-    card.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        showWordDetails(card.dataset.id);
-      }
-    });
-  });
   document
     .querySelectorAll('[data-action="info"]')
     .forEach((button) =>
