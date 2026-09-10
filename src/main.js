@@ -116,7 +116,7 @@ function render() {
   app.innerHTML = `
     <header class="border-b border-slate-200 bg-white/85">
       <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 lg:px-8">
-        <a class="flex items-center gap-2.5 text-lg font-bold tracking-tight text-slate-900" href="#"><span class="grid h-8 w-8 place-items-center rounded-lg bg-indigo-600 text-sm text-white">L</span>Lexicon</a>
+        <a class="flex items-center gap-2.5 text-lg font-bold tracking-tight text-slate-900" href="#"><img class="h-8 w-8" src="/logo.svg" alt="Lexicon logo">Lexicon</a>
         <span class="hidden text-xs font-medium text-slate-500 sm:block">${databaseConnected ? "MongoDB connected" : "Local cache mode"}</span>
       </div>
     </header>

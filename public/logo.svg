@@ -1,0 +1,16 @@
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Gradient Definion -->
+  <defs>
+    <linearGradient id="lexicon-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#635BFF" />
+      <stop offset="100%" stop-color="#3B82F6" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Outer Rounded Square -->
+  <rect width="40" height="40" rx="10" fill="url(#lexicon-grad)" />
+  
+  <!-- L Letter + Open Book Icon -->
+  <path d="M12 11V29C12 29 15.5 27 20 27C24.5 27 28 29 28 29V11C28 11 24.5 9 20 9C15.5 9 12 11 12 11Z" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M20 9V27" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+</svg>
